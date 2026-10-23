@@ -230,6 +230,11 @@ def check_and_autoclose_reports():
 
 check_and_autoclose_reports()
 check_upcoming_deadlines_and_notify()
+
+# СОРТИРОВКА: Выстраиваем отчеты в сессии по хронологии дедлайна (от ближайших к дальним)
+if "reports" in st.session_state and st.session_state.reports:
+    st.session_state.reports.sort(key=lambda x: x["deadline"])
+    
 # --- 5. ЛОГИКА ЦВЕТОВОЙ ПОДДСВЕТКИ КАРТОЧЕК ---
 def get_status_theme(r):
     today = datetime.date.today()
