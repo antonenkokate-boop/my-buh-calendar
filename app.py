@@ -341,6 +341,7 @@ with tab1:
                                 </div>
                             """, unsafe_allow_html=True)
                             
+                           # --- ОБНОВЛЕННЫЙ КОД (вставьте его вместо исходного) ---
                             if r["has_base_control"]:
                                 old_base = r["has_base"]
                                 r["has_base"] = st.checkbox("Наличие налоговой базы", value=r["has_base"], key=f"base_{r['id']}")
@@ -350,11 +351,14 @@ with tab1:
                                     save_log_entry(r["name"], r["deadline"], f"Изменено наличие базы: {base_status}", r.get("comment", ""))
                                     st.rerun()
                                     
-                            st.divider()
+                            # Заменили st.divider() на ультра-компактную линию для сжатия отступа
+                            st.markdown("<hr style='margin: 4px 0px 12px 0px; border: 0; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
                             
-                            # Статусы в одну строчку
-                            status_cols = st.columns(len(r["statuses"].keys()))
-                            for idx, status_name in enumerate(r["statuses"].keys()):
+                            # Упорядоченный список: "Принят" теперь идет ПЕРЕД "Оплачен"
+                            ordered_statuses = ["Подготовлен", "Отправлен", "Принят", "Оплачен"]
+                            
+                            status_cols = st.columns(len(ordered_statuses))
+                            for idx, status_name in enumerate(ordered_statuses):
                                 if status_name == "Оплачен" and r.get("is_stat", False):
                                     continue
                                 with status_cols[idx]:
