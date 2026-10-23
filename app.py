@@ -247,7 +247,7 @@ def get_status_theme(r):
 
 tab1, tab2, tab3 = st.tabs(["📊 Планнер", "🛠️ Настройки / Редактор", "📜 История"])
 
-# --- ВКЛАДКА 1: КАНБАН-ДОСКА (3 КОЛОНКИ) ---
+# --- ВКЛАДКА 1: КАНБАН-ДОСКА (3 КОЛОНКИ С ВСТРОЕННЫМ УПРАВЛЕНИЕМ) ---
 with tab1:
     today = datetime.date.today()
     col1_tasks, col2_tasks, col3_tasks = [], [], []
@@ -268,10 +268,13 @@ with tab1:
         {"col": col3, "title": "🌐 Более 30 дней", "tasks": col3_tasks}
     ]
     
+    # Переменная для отслеживания выбранного ID налога
+    selected_id = st.session_state.get("selected_task_id", None)
+    
     for c_cfg in columns_config:
         with c_cfg["col"]:
             st.markdown(f"### {c_cfg['title']}")
-            with st.container(height=500):
+            with st.container(height=650 if selected_id else 500): 
                 if not c_cfg["tasks"]:
                     st.caption("Нет задач")
                 else:
@@ -289,79 +292,77 @@ with tab1:
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
+                        
+                        # Кнопка под конкретной карточкой
                         if st.button("⚙️ Управлять", key=f"manage_{r['id']}"):
                             st.session_state.selected_task_id = r["id"]
-
-    if "selected_task_id" in st.session_state:
-        st.markdown("---")
-        task_id = st.session_state.selected_task_id
-        task = next((rep for rep in st.session_state.reports if rep["id"] == task_id), None)
-        
-        if task:
-            st.subheader(f"🛠️ Управление: {task['name']}")
-            cc1, cc2, cc3 = st.columns(3)
-            with cc1:
-                st.info(f"📅 Дедлайн: **{task['deadline'].strftime('%d.%m.%Y')}**")
-                if task["has_base_control"]:
-                    old_base = task["has_base"]
-                    task["has_base"] = st.checkbox("Наличие налоговой базы", value=task["has_base"], key=f"base_{task_id}")
-                    if old_base != task["has_base"]:
-                        save_data()
-                        # ИСПРАВЛЕНО: Автоматическое мгновенное логирование изменения базы
-                        base_status = "Есть" if task["has_base"] else "Отсутствует"
-                        save_log_entry(task["name"], task["deadline"], f"Изменено наличие базы: {base_status}", task.get("comment", ""))
-                        st.rerun()
-            with cc2:
-                st.write("**Чек-лист выполнения:**")
-                for status_name in task["statuses"].keys():
-                    if status_name == "Оплачен" and task.get("is_stat", False):
-                        continue
-                        
-                    old_val = task["statuses"][status_name]
-                    task["statuses"][status_name] = st.checkbox(status_name, value=task["statuses"][status_name], key=f"chk_{status_name}_{task_id}")
-                    
-                    # ИСПРАВЛЕНО: Мгновенное авто-логирование каждого клика по чекбоксу
-                    if old_val != task["statuses"][status_name]:
-                        save_data()
-                        ch_status = "Включено" if task["statuses"][status_name] else "Выключено"
-                        save_log_entry(task["name"], task["deadline"], f"Статус '{status_name}': {ch_status}", task.get("comment", ""))
-                        st.rerun()
-            with cc3:
-                old_comm = task.get("comment", "")
-                task["comment"] = st.text_input("Комментарий к периоду", value=old_comm, key=f"comm_{task_id}")
-                if old_comm != task["comment"]:
-                    save_data()
-                    # ИСПРАВЛЕНО: Мгновенное авто-логирование изменения комментария при потере фокуса / Enter
-                    save_log_entry(task["name"], task["deadline"], f"Обновлен комментарий периода", task["comment"])
-                    st.rerun()
-            
-            c_btn1, c_btn2 = st.columns(2)
-            with c_btn1:
-                if st.button("🏁 Закрыть период и перенести дедлайн", type="primary", key="close_period_btn", use_container_width=True):
-                    active_steps = [k for k, v in task["statuses"].items() if v and not (k == "Оплачен" and task.get("is_stat", False))]
-                    if not active_steps:
-                        active_steps = ["Без отметок"]
-                    action_detail = f"🏁 ПЕРИОД ЗАКРЫТ ВРУЧНУЮ. Выполненные шаги: {', '.join(active_steps)}"
-                    
-                    save_log_entry(task["name"], task["deadline"], action_detail, task["comment"])
-                    
-                    for k in task["statuses"]:
-                        task["statuses"][k] = False
-                    task["comment"] = ""
-                    
-                    if task.get("end_date") and task["deadline"] >= task["end_date"]:
-                        st.session_state.reports = [rep for rep in st.session_state.reports if rep["id"] != task["id"]]
-                    else:
-                        task["deadline"] = calculate_first_deadline(task["day"], task["months"], start_date=task["deadline"] + datetime.timedelta(days=1))
-                    
-                    save_data()
-                    del st.session_state.selected_task_id
-                    st.success("Период успешно закрыт!")
-                    st.rerun()
-            with c_btn2:
-                if st.button("❌ Закрыть панель", key="close_panel_btn", use_container_width=True):
-                    del st.session_state.selected_task_id
-                    st.rerun()
+                            st.rerun()
+                            
+                        # ИСПРАВЛЕНО: Если этот налог выбран, панель разворачивается СТРОГО под ним внутри той же колонки!
+                        if selected_id == r["id"]:
+                            st.markdown("""<div style="background-color: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #e9ecef; margin-top: 5px; margin-bottom: 15px;">""", unsafe_allow_html=True)
+                            st.caption(f"**🛠️ Управление: {r['name']}**")
+                            
+                            st.info(f"📅 Дедлайн: **{r['deadline'].strftime('%d.%m.%Y')}**")
+                            
+                            if r["has_base_control"]:
+                                old_base = r["has_base"]
+                                r["has_base"] = st.checkbox("Наличие налоговой базы", value=r["has_base"], key=f"base_{r['id']}")
+                                if old_base != r["has_base"]:
+                                    save_data()
+                                    base_status = "Есть" if r["has_base"] else "Отсутствует"
+                                    save_log_entry(r["name"], r["deadline"], f"Изменено наличие базы: {base_status}", r.get("comment", ""))
+                                    st.rerun()
+                                    
+                            st.write("---")
+                            for status_name in r["statuses"].keys():
+                                if status_name == "Оплачен" and r.get("is_stat", False):
+                                    continue
+                                old_val = r["statuses"][status_name]
+                                r["statuses"][status_name] = st.checkbox(status_name, value=r["statuses"][status_name], key=f"chk_{status_name}_{r['id']}")
+                                if old_val != r["statuses"][status_name]:
+                                    save_data()
+                                    ch_status = "Включено" if r["statuses"][status_name] else "Выключено"
+                                    save_log_entry(r["name"], r["deadline"], f"Статус '{status_name}': {ch_status}", r.get("comment", ""))
+                                    st.rerun()
+                                    
+                            st.write("---")
+                            old_comm = r.get("comment", "")
+                            r["comment"] = st.text_input("Комментарий периода", value=old_comm, key=f"comm_{r['id']}")
+                            if old_comm != r["comment"]:
+                                save_data()
+                                save_log_entry(r["name"], r["deadline"], f"Обновлен комментарий периода", r["comment"])
+                                st.rerun()
+                                
+                            st.write("---")
+                            # Кнопки действий внутри встроенной панели
+                            if st.button("🏁 Закрыть период", type="primary", key=f"close_btn_{r['id']}", use_container_width=True):
+                                active_steps = [k for k, v in r["statuses"].items() if v and not (k == "Оплачен" and r.get("is_stat", False))]
+                                if not active_steps:
+                                    active_steps = ["Без отметок"]
+                                action_detail = f"🏁 ПЕРИОД ЗАКРЫТ ВРУЧНУЮ. Выполненные шаги: {', '.join(active_steps)}"
+                                
+                                save_log_entry(r["name"], r["deadline"], action_detail, r["comment"])
+                                
+                                for k in r["statuses"]:
+                                    r["statuses"][k] = False
+                                r["comment"] = ""
+                                
+                                if r.get("end_date") and r["deadline"] >= r["end_date"]:
+                                    st.session_state.reports = [rep for rep in st.session_state.reports if rep["id"] != r["id"]]
+                                else:
+                                    r["deadline"] = calculate_first_deadline(r["day"], r["months"], start_date=r["deadline"] + datetime.timedelta(days=1))
+                                
+                                save_data()
+                                del st.session_state.selected_task_id
+                                st.success("Период закрыт!")
+                                st.rerun()
+                                
+                            if st.button("❌ Скрыть панель", key=f"close_panel_{r['id']}", use_container_width=True):
+                                del st.session_state.selected_task_id
+                                st.rerun()
+                                
+                            st.markdown("</div>", unsafe_allow_html=True)
 # --- ВКЛАДКА 2: НАСТРОЙКИ СПРАВОЧНИКА НАЛОГОВ ---
 with tab2:
     st.subheader("🛠️ Управление справочником")
