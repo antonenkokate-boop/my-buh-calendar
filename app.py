@@ -50,23 +50,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================================================================
-# ⚠️ ВНИМАНИЕ! ЗАПОЛНИТЕ ЭТИ ДВЕ СТРОЧКИ СВОИМИ ДАННЫМИ:
+# ⚠️ НАСТРОЙКИ ПРИВЯЗКИ К GITHUB
 # =========================================================================
-# 1. Сюда вставьте длинный токен (пароль), который вы создали на GitHub (начинается на ghp_...)
 GITHUB_TOKEN = "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"
-
-# 2. Сюда вставьте ваше имя на GitHub и через слэш название этого репозитория.
-# Например: "ivanov-account/buh-calendar"
 GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
 # =========================================================================
 
 DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
-
 def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API."""
-    # ИСПРАВЛЕНО: Правильный адрес ://github.com
-    url = f"https://://github.com{GITHUB_REPO}/contents/{filename}"
+    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
         res = requests.get(url, headers=headers, timeout=5)
@@ -81,8 +75,7 @@ def get_github_file(filename):
 
 def save_github_file(filename, data_to_save):
     """Вспомогательная функция для автоматической записи файла на GitHub."""
-    # ИСПРАВЛЕНО: Правильный адрес ://github.com
-    url = f"https://://github.com{GITHUB_REPO}/contents/{filename}"
+    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
     _, sha = get_github_file(filename)
@@ -156,9 +149,7 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
     }
     logs.insert(0, entry)
     save_github_file(LOG_FILE, logs)
-
 # --- НАСТРОЙКА ТЕЛЕГРАМ-УВЕДОМЛЕНИЙ ---
-# Изменили структуру, чтобы убрать любое упоминание старого адреса из памяти
 TG_BOT_TOKEN = "8807247946:AAHWnh-5y1PzA13VvoJPgzsh0Ne-X13pXdo"
 TG_USER_ID = "631793577"
 
@@ -210,11 +201,9 @@ MONTHS_RU = {
 def send_telegram_reminder(message):
     """Отправляет текстовое уведомление через созданного бота."""
     try:
-        # ИСПРАВЛЕНО: Полный и точный адрес отправки для вашего бота
-        direct_url = "https://telegram.org"
-        
+        direct_url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
         payload = {
-            "chat_id": "631793577", 
+            "chat_id": str(TG_USER_ID), 
             "text": message, 
             "parse_mode": "Markdown"
         }
@@ -244,7 +233,6 @@ def check_upcoming_deadlines_and_notify():
                     msg = f"⚠️ *НАПОМИНАНИЕ О ДЕДЛАЙНЕ!*\n\n📊 Налог: *{r['name']}*\n📅 Дата сдачи: *{r['deadline'].strftime('%d.%m.%Y')}*\n⏳ Осталось дней: *{days_left}*"
                     send_telegram_reminder(msg)
                     st.session_state.notified_dates[r["id"]] = today
-
 # --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ (С УЛУЧШЕННОЙ ЗАЩИТОЙ) ---
 saved_reports = load_data()
 
@@ -252,8 +240,6 @@ if "reports" not in st.session_state:
     if saved_reports:  
         st.session_state.reports = saved_reports
     else:
-        # Если на GitHub файла нет, мы берём дефолтный список,
-        # НО только если в сессии действительно пусто
         st.session_state.reports = []
         months_vat = {m: True for m in MONTHS_RU.keys()}
         payments_vat = {m: False for m in MONTHS_RU.keys()}
@@ -263,11 +249,8 @@ if "reports" not in st.session_state:
             "statuses": {"Подготовлен": False, "Отправлен": False, "Оплачен": False, "Принят": False},
             "deadline": calculate_first_deadline(20, months_vat)
         })
-        # Пробуем сохранить, чтобы файл database.json создался на GitHub
         save_data()
 else:
-    # КРИТИЧЕСКИЙ БЛОК: Если страница обновилась, но на GitHub уже есть сохраненные отчеты,
-    # мы принудительно восстанавливаем их в сессию, не давая скрипту затереть их пустой базой
     if saved_reports and len(saved_reports) > len(st.session_state.reports):
         st.session_state.reports = saved_reports
 
