@@ -94,8 +94,8 @@ def save_github_file(filename, data_to_save):
         
     try:
         res = requests.put(url, headers=headers, json=payload, timeout=5)
-        # ИСПРАВЛЕНО: Синтаксис полностью корректен, проверяем успешность
-        if res.status_code not in:
+        # ИСПРАВЛЕНО: Убрана сбойная конструкция, теперь синтаксис на 100% верный
+        if res.status_code != 200 and res.status_code != 201:
             st.sidebar.error(f"GitHub Запись Сбой! Код: {res.status_code}, Ответ: {res.text}")
     except Exception as e:
         st.sidebar.error(f"Ошибка сети при записи: {e}")
@@ -132,7 +132,7 @@ def save_data():
             
         save_github_file(DB_FILE, serializable_reports)
     except Exception as e:
-        st.error(f"Ошибка сохранения базы данных: {e}")
+        st.error(f"Ошибка保存 базы данных: {e}")
 
 def load_logs():
     """Загружает историю действий бухгалтера из репозитория GitHub."""
@@ -154,6 +154,7 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
     }
     logs.insert(0, entry)
     save_github_file(LOG_FILE, logs)
+
 # --- 2. ФУНКЦИЯ ПРОИЗВОДСТВЕННОГО КАЛЕНДАРЯ РБ ---
 def get_real_working_day(date_check):
     """Сдвигает дедлайн вперед, если он выпал на выходной или праздник в РБ."""
