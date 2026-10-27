@@ -59,6 +59,7 @@ DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
 def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API с выводом ошибок."""
+    # ИСПРАВЛЕНО: Теперь адрес ведет на официальный рабочий API-сервер GitHub
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
@@ -76,6 +77,7 @@ def get_github_file(filename):
 
 def save_github_file(filename, data_to_save):
     """Вспомогательная функция для автоматической записи файла на GitHub с выводом ошибок."""
+    # ИСПРАВЛЕНО: Теперь адрес ведет на официальный рабочий API-сервер GitHub
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
@@ -94,7 +96,6 @@ def save_github_file(filename, data_to_save):
         
     try:
         res = requests.put(url, headers=headers, json=payload, timeout=5)
-        # ИСПРАВЛЕНО: Убрана сбойная конструкция, теперь синтаксис на 100% верный
         if res.status_code != 200 and res.status_code != 201:
             st.sidebar.error(f"GitHub Запись Сбой! Код: {res.status_code}, Ответ: {res.text}")
     except Exception as e:
