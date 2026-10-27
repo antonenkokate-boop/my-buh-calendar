@@ -61,7 +61,8 @@ def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API с выводом ошибок."""
     # ИСПРАВЛЕНО: Теперь адрес ведет на официальный рабочий API-сервер GitHub
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+
     try:
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
