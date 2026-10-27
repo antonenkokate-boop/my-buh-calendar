@@ -52,7 +52,7 @@ st.markdown("""
 # =========================================================================
 # ⚠️ НАСТРОЙКИ ПРИВЯЗКИ К GITHUB
 # =========================================================================
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
 # =========================================================================
 
