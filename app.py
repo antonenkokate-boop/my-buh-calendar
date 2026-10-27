@@ -244,13 +244,15 @@ def check_upcoming_deadlines_and_notify():
                     send_telegram_reminder(msg)
                     st.session_state.notified_dates[r["id"]] = today
 
-# --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ (С ЗАЩИТОЙ ОТ СТИРАНИЯ) ---
+# --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ (С УЛУЧШЕННОЙ ЗАЩИТОЙ) ---
 saved_reports = load_data()
 
 if "reports" not in st.session_state:
     if saved_reports:  
         st.session_state.reports = saved_reports
     else:
+        # Если на GitHub файла нет, мы берём дефолтный список,
+        # НО только если в сессии действительно пусто
         st.session_state.reports = []
         months_vat = {m: True for m in MONTHS_RU.keys()}
         payments_vat = {m: False for m in MONTHS_RU.keys()}
@@ -260,12 +262,13 @@ if "reports" not in st.session_state:
             "statuses": {"Подготовлен": False, "Отправлен": False, "Оплачен": False, "Принят": False},
             "deadline": calculate_first_deadline(20, months_vat)
         })
+        # Пробуем сохранить, чтобы файл database.json создался на GitHub
         save_data()
 else:
-    # Защита от потери данных при внезапном сбросе кеша Streamlit
-    if saved_reports and len(st.session_state.reports) <= 1:
-        if len(saved_reports) > 1 or (saved_reports and saved_reports[0]["name"] != "Ввозной НДС (ЕАЭС)"):
-            st.session_state.reports = saved_reports
+    # КРИТИЧЕСКИЙ БЛОК: Если страница обновилась, но на GitHub уже есть сохраненные отчеты,
+    # мы принудительно восстанавливаем их в сессию, не давая скрипту затереть их пустой базой
+    if saved_reports and len(saved_reports) > len(st.session_state.reports):
+        st.session_state.reports = saved_reports
 
 # --- 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА И ЗАКРЫТИЕ ХВОСТОВ ---
 def check_and_autoclose_reports():
