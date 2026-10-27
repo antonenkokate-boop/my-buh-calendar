@@ -170,11 +170,16 @@ def send_telegram_reminder(message):
     if not TG_BOT_TOKEN or not TG_USER_ID:
         return
     try:
+        # ИСПРАВЛЕННЫЙ URL API TELEGRAM
         url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
         payload = {"chat_id": TG_USER_ID, "text": message, "parse_mode": "Markdown"}
-        requests.post(url, json=payload, timeout=3)
-    except Exception:
-        pass
+        response = requests.post(url, json=payload, timeout=5)
+        
+        # Если нужно отладить в консоли, раскомментируйте строку ниже:
+        # print("Статус отправки в TG:", response.status_code, response.text)
+    except Exception as e:
+        # Выводим ошибку на экран приложения для отладки, если что-то пойдет не так
+        st.sidebar.error(f"Ошибка отправки TG: {e}")
 
 def check_upcoming_deadlines_and_notify():
     """Проверяет горящие дедлайны и шлет напоминание."""
@@ -204,9 +209,11 @@ def check_upcoming_deadlines_and_notify():
 saved_reports = load_data()
 
 if "reports" not in st.session_state:
-    if saved_reports is not None:
+    # Если в файле что-то есть — жестко берем из файла
+    if saved_reports:  
         st.session_state.reports = saved_reports
     else:
+        # Если файл пустой ИЛИ его нет — только тогда создаем начальный список
         st.session_state.reports = []
         months_vat = {m: True for m in MONTHS_RU.keys()}
         payments_vat = {m: False for m in MONTHS_RU.keys()}
@@ -217,6 +224,11 @@ if "reports" not in st.session_state:
             "deadline": calculate_first_deadline(20, months_vat)
         })
         save_data()
+else:
+    # ЗАЩИТА: Если сессия упала, но файл на диске существует и не пустой — восстанавливаем из файла,
+    # чтобы не дать скрипту занулить базу дефолтным значением
+    if saved_reports and len(st.session_state.reports) <= 1 and saved_reports[0]["name"] != "Ввозной НДС (ЕАЭС)":
+        st.session_state.reports = saved_reports
 
 # --- 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА И ЗАКРЫТИЕ ХВОСТОВ (Дедлайн + 3 дня) ---
 def check_and_autoclose_reports():
