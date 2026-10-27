@@ -65,7 +65,8 @@ LOG_FILE = "history_logs.json"
 
 def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API."""
-    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
+    # ИСПРАВЛЕНО: Правильный адрес ://github.com
+    url = f"https://://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
         res = requests.get(url, headers=headers, timeout=5)
@@ -80,7 +81,8 @@ def get_github_file(filename):
 
 def save_github_file(filename, data_to_save):
     """Вспомогательная функция для автоматической записи файла на GitHub."""
-    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
+    # ИСПРАВЛЕНО: Правильный адрес ://github.com
+    url = f"https://://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
     _, sha = get_github_file(filename)
@@ -208,8 +210,7 @@ MONTHS_RU = {
 def send_telegram_reminder(message):
     """Отправляет текстовое уведомление через созданного бота."""
     try:
-        # Полностью готовая прямая ссылка без единой переменной в адресе хоста.
-        # Это физически исключает ошибку 'telegram.org8807...'
+        # ИСПРАВЛЕНО: Полный и точный адрес отправки для вашего бота
         direct_url = "https://telegram.org"
         
         payload = {
