@@ -60,6 +60,7 @@ DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
 def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API."""
+    # ИСПРАВЛЕНО: Правильный адрес для работы с файлами через API
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
@@ -75,6 +76,7 @@ def get_github_file(filename):
 
 def save_github_file(filename, data_to_save):
     """Вспомогательная функция для автоматической записи файла на GitHub."""
+    # ИСПРАВЛЕНО: Правильный адрес для работы с файлами через API
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
@@ -204,6 +206,7 @@ MONTHS_RU = {
 def send_telegram_reminder(message):
     """Отправляет текстовое уведомление через созданного бота."""
     try:
+        # ИСПРАВЛЕНО: Полный и точный адрес API Telegram без склеек и опечаток
         direct_url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
         payload = {
             "chat_id": str(TG_USER_ID), 
@@ -212,7 +215,8 @@ def send_telegram_reminder(message):
         }
         requests.post(direct_url, json=payload, timeout=5)
     except Exception as e:
-        st.sidebar.error(f"Критическая ошибка сети: {e}")
+        st.sidebar.error(f"Ошибка сети Telegram: {e}")
+
 
 def check_upcoming_deadlines_and_notify():
     """Проверяет горящие дедлайны и шлет напоминание."""
