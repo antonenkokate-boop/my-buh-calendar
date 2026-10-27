@@ -73,8 +73,7 @@ def get_github_file(filename):
     return None, None
 
 def get_github_file(filename):
-    """Вспомогательная функция для безопасного чтения файла с GitHub API."""
-    # ИСПРАВЛЕНО: Установлен точный и верный адрес официального API GitHub
+    """Вспомогательная функция для безопасного чтения файла с GitHub API с выводом ошибок."""
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
@@ -84,13 +83,15 @@ def get_github_file(filename):
             import base64
             file_content = base64.b64decode(content_json["content"]).decode("utf-8")
             return json.loads(file_content), content_json["sha"]
-    except Exception:
-        pass
+        elif res.status_code != 404:
+            # Выводим на экран код ошибки (например, 401 - неверный токен, 403 - нет прав)
+            st.sidebar.error(f"GitHub Чтение Сбой! Файл: {filename}, Статус: {res.status_code}, Ответ: {res.text}")
+    except Exception as e:
+        st.sidebar.error(f"Ошибка сети при чтении: {e}")
     return None, None
 
 def save_github_file(filename, data_to_save):
-    """Вспомогательная функция для автоматической записи файла на GitHub."""
-    # ИСПРАВЛЕНО: Установлен точный и верный адрес официального API GitHub
+    """Вспомогательная функция для автоматической записи файла на GitHub с выводом ошибок."""
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
@@ -108,9 +109,12 @@ def save_github_file(filename, data_to_save):
         payload["sha"] = sha
         
     try:
-        requests.put(url, headers=headers, json=payload, timeout=5)
-    except Exception:
-        pass
+        res = requests.put(url, headers=headers, json=payload, timeout=5)
+        if res.status_code not in:
+            # Показывает точную причину отказа со стороны серверов GitHub
+            st.sidebar.error(f"GitHub Запись Заблокирована! Файл: {filename}, Статус: {res.status_code}, Текст: {res.text}")
+    except Exception as e:
+        st.sidebar.error(f"Ошибка сети при записи: {e}")
 
 def load_data():
     """Загружает данные налогов прямо из репозитория GitHub."""
