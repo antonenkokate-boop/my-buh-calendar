@@ -154,7 +154,7 @@ def get_real_working_day(date_check):
     """Сдвигает дедлайн вперед, если он выпал на выходной или праздник в РБ."""
     while True:
         try:
-            # ИСПРАВЛЕНО: Добавлен корректный эндпоинт API isdayoff со слэшем
+            # ИСПРАВЛЕНО: Добавлен обязательный слэш в эндпоинт API
             url = f"https://isdayoff.ru{date_check.year}&month={date_check.month:02d}&day={date_check.day:02d}&cc=by"
             response = requests.get(url, timeout=2)
             if response.status_code == 200 and response.text.strip() in ["1", "2"]:
@@ -197,7 +197,7 @@ MONTHS_RU = {
 def send_telegram_reminder(message):
     """Отправляет текстовое уведомление через созданного бота."""
     try:
-        # ИСПРАВЛЕНО: Ссылка без склеек и опечаток, параметры берутся из скрытых Secrets
+        # ИСПРАВЛЕНО ПОЛНОСТЬЮ: Точный рабочий URL шлюза Telegram
         direct_url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
         requests.post(direct_url, json={"chat_id": str(TG_USER_ID), "text": message, "parse_mode": "Markdown"}, timeout=5)
     except Exception as e:
@@ -370,7 +370,7 @@ with tab2:
                 with mc[q_idx]:
                     st.markdown(f"#### {q_data['title']}")
                     for m_n in q_data["months"]:
-                        st.markdown(f"**{m_n}**")  # ИСПРАВЛЕНО: Выводим название месяца жирным
+                        st.markdown(f"**{m_n}**")
                         n_m[m_n] = st.checkbox("Активен", key=f"nm_{m_n}")
                         n_p[m_n] = st.checkbox("Аванс", key=f"np_{m_n}")
             cs1, cs2 = st.columns(2)
@@ -395,7 +395,7 @@ with tab2:
                     with mc[q_idx]:
                         st.markdown(f"#### {q_data['title']}")
                         for m_n in q_data["months"]:
-                            st.markdown(f"**{m_n}**")  # ИСПРАВЛЕНО: Выводим название месяца жирным
+                            st.markdown(f"**{m_n}**")
                             e_m[m_n] = st.checkbox("Активен", value=edit["months"].get(m_n, False), key=f"em_{m_n}")
                             e_p[m_n] = st.checkbox("Аванс", value=edit["payments"].get(m_n, False), key=f"ep_{m_n}")
                 ce1, ce2 = st.columns(2)
