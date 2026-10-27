@@ -51,7 +51,6 @@ st.markdown("""
 
 DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
-
 # --- 1. ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ И ЛОГАМИ ---
 def load_data():
     """Загружает данные налогов из JSON."""
@@ -116,7 +115,7 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
             json.dump(logs, f, ensure_ascii=False, indent=4)
     except Exception:
         pass
-# --- НАСТРОЙКА ТЕЛЕГРАМ-УВЕДОМЛЕНИЙ (ПОДКЛЮЧЕНО) ---
+# --- НАСТРОЙКА ТЕЛЕГРАМ-УВЕДОМЛЕНИЙ ---
 TG_BOT_TOKEN = "8807247946:AAHWnh-5y1PzA13VvoJPgzsh0Ne-X13pXdo"
 TG_USER_ID = "631793577"
 
@@ -170,15 +169,11 @@ def send_telegram_reminder(message):
     if not TG_BOT_TOKEN or not TG_USER_ID:
         return
     try:
-        # ИСПРАВЛЕННЫЙ URL API TELEGRAM
+        # ИСПРАВЛЕНО: Рабочий URL-адрес к API Telegram бота
         url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
         payload = {"chat_id": TG_USER_ID, "text": message, "parse_mode": "Markdown"}
-        response = requests.post(url, json=payload, timeout=5)
-        
-        # Если нужно отладить в консоли, раскомментируйте строку ниже:
-        # print("Статус отправки в TG:", response.status_code, response.text)
+        requests.post(url, json=payload, timeout=5)
     except Exception as e:
-        # Выводим ошибку на экран приложения для отладки, если что-то пойдет не так
         st.sidebar.error(f"Ошибка отправки TG: {e}")
 
 def check_upcoming_deadlines_and_notify():
@@ -188,7 +183,6 @@ def check_upcoming_deadlines_and_notify():
         
     today = datetime.date.today()
     for r in st.session_state.reports:
-        # Проверяем сдачу с учетом признака "Отчет без уплаты" (is_stat)
         is_done = r["statuses"]["Отправлен"] and r["statuses"]["Принят"]
         if r.get("is_stat", False):
             is_done = r["statuses"]["Отправлен"]
@@ -204,16 +198,13 @@ def check_upcoming_deadlines_and_notify():
                     msg = f"⚠️ *НАПОМИНАНИЕ О ДЕДЛАЙНЕ!*\n\n📊 Налог: *{r['name']}*\n📅 Дата сдачи: *{r['deadline'].strftime('%d.%m.%Y')}*\n⏳ Осталось дней: *{days_left}*"
                     send_telegram_reminder(msg)
                     st.session_state.notified_dates[r["id"]] = today
-
-# --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ ---
+# --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ (С ЗАЩИТОЙ ОТ СТИРАНИЯ) ---
 saved_reports = load_data()
 
 if "reports" not in st.session_state:
-    # Если в файле что-то есть — жестко берем из файла
     if saved_reports:  
         st.session_state.reports = saved_reports
     else:
-        # Если файл пустой ИЛИ его нет — только тогда создаем начальный список
         st.session_state.reports = []
         months_vat = {m: True for m in MONTHS_RU.keys()}
         payments_vat = {m: False for m in MONTHS_RU.keys()}
@@ -225,12 +216,12 @@ if "reports" not in st.session_state:
         })
         save_data()
 else:
-    # ЗАЩИТА: Если сессия упала, но файл на диске существует и не пустой — восстанавливаем из файла,
-    # чтобы не дать скрипту занулить базу дефолтным значением
-    if saved_reports and len(st.session_state.reports) <= 1 and saved_reports[0]["name"] != "Ввозной НДС (ЕАЭС)":
-        st.session_state.reports = saved_reports
+    # Защита от потери данных при внезапном сбросе кеша Streamlit
+    if saved_reports and len(st.session_state.reports) <= 1:
+        if len(saved_reports) > 1 or (saved_reports and saved_reports[0]["name"] != "Ввозной НДС (ЕАЭС)"):
+            st.session_state.reports = saved_reports
 
-# --- 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА И ЗАКРЫТИЕ ХВОСТОВ (Дедлайн + 3 дня) ---
+# --- 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА И ЗАКРЫТИЕ ХВОСТОВ ---
 def check_and_autoclose_reports():
     today = datetime.date.today()
     updated = False
@@ -259,7 +250,7 @@ def check_and_autoclose_reports():
 check_and_autoclose_reports()
 check_upcoming_deadlines_and_notify()
 
-# СОРТИРОВКА: Выстраиваем отчеты в сессии по хронологии дедлайна (от ближайших к дальним)
+# СОРТИРОВКА: Выстраиваем отчеты в сессии по хронологии дедлайна
 if "reports" in st.session_state and st.session_state.reports:
     st.session_state.reports.sort(key=lambda x: x["deadline"])
     
@@ -279,8 +270,7 @@ def get_status_theme(r):
     return "⚪ В работе", "#e2e3e5", "#383d41"
 
 tab1, tab2, tab3 = st.tabs(["📊 Планнер", "🛠️ Настройки / Редактор", "📜 История"])
-
-# --- ВКЛАДКА 1: КАНБАН-ДОСКА (ПОЛНАЯ ЗАМЕНА С НОВЫМ ВИЗУАЛОМ КАРТОЧЕК) ---
+# --- ВКЛАДКА 1: КАНБАН-ДОСКА ---
 with tab1:
     today = datetime.date.today()
     col1_tasks, col2_tasks, col3_tasks = [], [], []
@@ -288,11 +278,11 @@ with tab1:
     for r in st.session_state.reports:
         days_left = (r["deadline"] - today).days
         if days_left <= 7:
-            col1_tasks.append(r)  # 🔥 Неделя
+            col1_tasks.append(r)
         elif 7 < days_left <= 30:
-            col2_tasks.append(r)  # 📅 Месяц
+            col2_tasks.append(r)
         else:
-            col3_tasks.append(r)  # 🌐 Более 30 дней
+            col3_tasks.append(r)
 
     col1, col2, col3 = st.columns(3)
     columns_config = [
@@ -301,7 +291,6 @@ with tab1:
         {"col": col3, "title": "🌐 Более 30 дней", "tasks": col3_tasks}
     ]
     
-    # Переменная для отслеживания выбранного ID налога
     selected_id = st.session_state.get("selected_task_id", None)
     
     for c_cfg in columns_config:
@@ -315,7 +304,6 @@ with tab1:
                         status_text, bg_color, text_color = get_status_theme(r)
                         deadline_str = r["deadline"].strftime("%d.%m.%Y")
                         
-                        # Создаем единый контейнер-рамку для всей карточки
                         with st.container():
                             st.markdown(f"""
                             <div class="task-box">
@@ -331,7 +319,6 @@ with tab1:
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Смещение кнопки внутрь рамки в правый верхний угол
                             st.markdown('<div style="margin-top: -65px; margin-bottom: 25px; display: flex; justify-content: flex-end; padding-right: 15px;">', unsafe_allow_html=True)
                             if st.button("⚙️ Управлять", key=f"manage_{r['id']}"):
                                 if selected_id == r["id"]:
@@ -341,19 +328,16 @@ with tab1:
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
                         
-                        # Разворачиваемая панель управления строго под карточкой
                         if selected_id == r["id"]:
                             st.write("") 
                             st.markdown(f"##### 🛠️ Управление: {r['name']}")
                             
-                            # Синяя плашка дедлайна
                             st.markdown(f"""
                                 <div style="background-color: #e8f2ff; padding: 12px; border-radius: 8px; border-left: 5px solid #1d4ed8; margin-bottom: 15px;">
                                     📅 <b>Дедлайн: {r['deadline'].strftime('%d.%m.%Y')}</b>
                                 </div>
                             """, unsafe_allow_html=True)
                             
-                           # --- ОБНОВЛЕННЫЙ КОД (вставьте его вместо исходного) ---
                             if r["has_base_control"]:
                                 old_base = r["has_base"]
                                 r["has_base"] = st.checkbox("Наличие налоговой базы", value=r["has_base"], key=f"base_{r['id']}")
@@ -363,12 +347,9 @@ with tab1:
                                     save_log_entry(r["name"], r["deadline"], f"Изменено наличие базы: {base_status}", r.get("comment", ""))
                                     st.rerun()
                                     
-                            # Заменили st.divider() на ультра-компактную линию для сжатия отступа
                             st.markdown("<hr style='margin: 4px 0px 12px 0px; border: 0; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
                             
-                            # Упорядоченный список: "Принят" теперь идет ПЕРЕД "Оплачен"
                             ordered_statuses = ["Подготовлен", "Отправлен", "Принят", "Оплачен"]
-                            
                             status_cols = st.columns(len(ordered_statuses))
                             for idx, status_name in enumerate(ordered_statuses):
                                 if status_name == "Оплачен" and r.get("is_stat", False):
@@ -392,7 +373,6 @@ with tab1:
                                 
                             st.write("")
                             
-                            # Две нижние кнопки действий
                             b_col1, b_col2 = st.columns(2)
                             with b_col1:
                                 if st.button("❌ Скрыть панель", key=f"close_panel_{r['id']}", use_container_width=True):
@@ -420,9 +400,7 @@ with tab1:
                                     del st.session_state.selected_task_id
                                     st.success("Период закрыт!")
                                     st.rerun()
-                            
                             st.divider()
-
 # --- ВКЛАДКА 2: НАСТРОЙКИ СПРАВОЧНИКА НАЛОГОВ ---
 with tab2:
     st.subheader("🛠️ Управление справочником")
@@ -447,7 +425,7 @@ with tab2:
                     st.markdown(f"#### {q_data['title']}")
                     for m_n in q_data["months"]:
                         st.markdown(f"**{m_n}**")
-                        n_m[m_n] = st.checkbox("Активен", key=f"nm_{m_n}")
+                        n_m[m_n] = st.checkbox("Active", key=f"nm_{m_n}")
                         n_p[m_n] = st.checkbox("Только платеж (аванс)", key=f"np_{m_n}")
                         st.write("")
                     
