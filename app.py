@@ -49,28 +49,77 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# =========================================================================
+# ⚠️ ВНИМАНИЕ! ЗАПОЛНИТЕ ЭТИ ДВЕ СТРОЧКИ СВОИМИ ДАННЫМИ:
+# =========================================================================
+# 1. Сюда вставьте длинный токен (пароль), который вы создали на GitHub (начинается на ghp_...)
+GITHUB_TOKEN = "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"
+
+# 2. Сюда вставьте ваше имя на GitHub и через слэш название этого репозитория.
+# Например: "ivanov-account/buh-calendar"
+GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
+# =========================================================================
+
 DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
-# --- 1. ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ И ЛОГАМИ ---
+
+def get_github_file(filename):
+    """Вспомогательная функция для безопасного чтения файла с GitHub API."""
+    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            content_json = res.json()
+            import base64
+            file_content = base64.b64decode(content_json["content"]).decode("utf-8")
+            return json.loads(file_content), content_json["sha"]
+    except Exception:
+        pass
+    return None, None
+
+def save_github_file(filename, data_to_save):
+    """Вспомогательная функция для автоматической записи файла на GitHub."""
+    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    
+    _, sha = get_github_file(filename)
+    
+    import base64
+    json_str = json.dumps(data_to_save, ensure_ascii=False, indent=4)
+    content_bytes = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
+    
+    payload = {
+        "message": f"🤖 Авто-обновление {filename} от календаря бухгалтера",
+        "content": content_bytes
+    }
+    if sha:
+        payload["sha"] = sha
+        
+    try:
+        requests.put(url, headers=headers, json=payload, timeout=5)
+    except Exception:
+        pass
+
+# --- 1. ОБНОВЛЕННЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ И ЛОГАМИ ЧЕРЕЗ ОБЛАКО ---
 def load_data():
-    """Загружает данные налогов из JSON."""
-    if not os.path.exists(DB_FILE):
+    """Загружает данные налогов прямо из репозитория GitHub."""
+    data, _ = get_github_file(DB_FILE)
+    if not data:
         return None
     try:
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            for report in data:
-                report["deadline"] = datetime.datetime.strptime(report["deadline"], "%Y-%m-%d").date()
-                if report.get("end_date"):
-                    report["end_date"] = datetime.datetime.strptime(report["end_date"], "%Y-%m-%d").date()
-                else:
-                    report["end_date"] = None
-            return data
+        for report in data:
+            report["deadline"] = datetime.datetime.strptime(report["deadline"], "%Y-%m-%d").date()
+            if report.get("end_date"):
+                report["end_date"] = datetime.datetime.strptime(report["end_date"], "%Y-%m-%d").date()
+            else:
+                report["end_date"] = None
+        return data
     except Exception:
         return None
 
 def save_data():
-    """Сохраняет текущее состояние налогов в JSON."""
+    """Сохраняет текущее состояние налогов в файл на GitHub."""
     try:
         serializable_reports = []
         for r in st.session_state.reports:
@@ -81,23 +130,17 @@ def save_data():
                 r_copy["end_date"] = r_copy["end_date"].strftime("%Y-%m-%d")
             serializable_reports.append(r_copy)
             
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(serializable_reports, f, ensure_ascii=False, indent=4)
+        save_github_file(DB_FILE, serializable_reports)
     except Exception as e:
         st.error(f"Ошибка сохранения базы данных: {e}")
 
 def load_logs():
-    """Загружает историю действий бухгалтера."""
-    if not os.path.exists(LOG_FILE):
-        return []
-    try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+    """Загружает историю действий бухгалтера из репозитория GitHub."""
+    data, _ = get_github_file(LOG_FILE)
+    return data if data else []
 
 def save_log_entry(report_name, target_date, action_text, current_comment=""):
-    """Добавляет запись в журнал истории действий."""
+    """Добавляет запись в журнал истории действий на GitHub."""
     logs = load_logs()
     now_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     date_str = target_date.strftime("%d.%m.%Y") if isinstance(target_date, datetime.date) else str(target_date)
@@ -110,11 +153,8 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
         "period_comment": current_comment
     }
     logs.insert(0, entry)
-    try:
-        with open(LOG_FILE, "w", encoding="utf-8") as f:
-            json.dump(logs, f, ensure_ascii=False, indent=4)
-    except Exception:
-        pass
+    save_github_file(LOG_FILE, logs)
+
 # --- НАСТРОЙКА ТЕЛЕГРАМ-УВЕДОМЛЕНИЙ ---
 # Изменили структуру, чтобы убрать любое упоминание старого адреса из памяти
 TG_BOT_TOKEN = "8807247946:AAHWnh-5y1PzA13VvoJPgzsh0Ne-X13pXdo"
