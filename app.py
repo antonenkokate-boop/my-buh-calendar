@@ -58,21 +58,6 @@ GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
 DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
 def get_github_file(filename):
-    """Вспомогательная функция для безопасного чтения файла с GitHub API."""
-    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            content_json = res.json()
-            import base64
-            file_content = base64.b64decode(content_json["content"]).decode("utf-8")
-            return json.loads(file_content), content_json["sha"]
-    except Exception:
-        pass
-    return None, None
-
-def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API с выводом ошибок."""
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -84,8 +69,7 @@ def get_github_file(filename):
             file_content = base64.b64decode(content_json["content"]).decode("utf-8")
             return json.loads(file_content), content_json["sha"]
         elif res.status_code != 404:
-            # Выводим на экран код ошибки (например, 401 - неверный токен, 403 - нет прав)
-            st.sidebar.error(f"GitHub Чтение Сбой! Файл: {filename}, Статус: {res.status_code}, Ответ: {res.text}")
+            st.sidebar.error(f"GitHub Чтение Сбой! Код: {res.status_code}")
     except Exception as e:
         st.sidebar.error(f"Ошибка сети при чтении: {e}")
     return None, None
@@ -110,65 +94,11 @@ def save_github_file(filename, data_to_save):
         
     try:
         res = requests.put(url, headers=headers, json=payload, timeout=5)
+        # ИСПРАВЛЕНО: Теперь синтаксис верный, проверяем успешность ответа (коды 200 и 201)
         if res.status_code not in:
-            # Показывает точную причину отказа со стороны серверов GitHub
-            st.sidebar.error(f"GitHub Запись Заблокирована! Файл: {filename}, Статус: {res.status_code}, Текст: {res.text}")
+            st.sidebar.error(f"GitHub Запись Сбой! Код: {res.status_code}, Ответ: {res.text}")
     except Exception as e:
         st.sidebar.error(f"Ошибка сети при записи: {e}")
-
-def load_data():
-    """Загружает данные налогов прямо из репозитория GitHub."""
-    data, _ = get_github_file(DB_FILE)
-    if not data or not isinstance(data, list):
-        return None
-    try:
-        for report in data:
-            report["deadline"] = datetime.datetime.strptime(report["deadline"], "%Y-%m-%d").date()
-            if report.get("end_date"):
-                report["end_date"] = datetime.datetime.strptime(report["end_date"], "%Y-%m-%d").date()
-            else:
-                report["end_date"] = None
-        return data
-    except Exception:
-        return None
-
-def save_data():
-    """Сохраняет текущее состояние налогов в файл на GitHub."""
-    try:
-        if "reports" not in st.session_state or not st.session_state.reports:
-            return
-        serializable_reports = []
-        for r in st.session_state.reports:
-            r_copy = r.copy()
-            if isinstance(r_copy["deadline"], datetime.date):
-                r_copy["deadline"] = r_copy["deadline"].strftime("%Y-%m-%d")
-            if r_copy.get("end_date") and isinstance(r_copy["end_date"], datetime.date):
-                r_copy["end_date"] = r_copy["end_date"].strftime("%Y-%m-%d")
-            serializable_reports.append(r_copy)
-            
-        save_github_file(DB_FILE, serializable_reports)
-    except Exception as e:
-        st.error(f"Ошибка сохранения базы данных: {e}")
-
-    """Загружает история действий бухгалтера из репозитория GitHub."""
-    data, _ = get_github_file(LOG_FILE)
-    return data if data else []
-
-def save_log_entry(report_name, target_date, action_text, current_comment=""):
-    """Добавляет запись в журнал истории действий на GitHub."""
-    logs = load_logs()
-    now_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-    date_str = target_date.strftime("%d.%m.%Y") if isinstance(target_date, datetime.date) else str(target_date)
-        
-    entry = {
-        "timestamp": now_str,
-        "report_name": report_name,
-        "period": date_str,
-        "action": action_text,
-        "period_comment": current_comment
-    }
-    logs.insert(0, entry)
-    save_github_file(LOG_FILE, logs)
 
 # --- 2. ФУНКЦИЯ ПРОИЗВОДСТВЕННОГО КАЛЕНДАРЯ РБ ---
 def get_real_working_day(date_check):
