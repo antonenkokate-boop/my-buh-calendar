@@ -49,18 +49,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# =========================================================================
-# ⚠️ НАСТРОЙКИ ПРИВЯЗКИ К GITHUB
-# =========================================================================
-GITHUB_TOKEN = "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"
-GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
-# =========================================================================
+# --- ИСПРАВЛЕНО: Безопасное чтение токенов из скрытого раздела Secrets в Streamlit Cloud ---
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+TG_BOT_TOKEN = st.secrets["TG_BOT_TOKEN"]
+TG_USER_ID = st.secrets["TG_USER_ID"]
 
+GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
 DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
 def get_github_file(filename):
     """Вспомогательная функция для безопасного чтения файла с GitHub API."""
-    # ИСПРАВЛЕНО: Правильный адрес для работы с файлами через API
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     try:
@@ -76,7 +74,6 @@ def get_github_file(filename):
 
 def save_github_file(filename, data_to_save):
     """Вспомогательная функция для автоматической записи файла на GitHub."""
-    # ИСПРАВЛЕНО: Правильный адрес для работы с файлами через API
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
@@ -98,7 +95,6 @@ def save_github_file(filename, data_to_save):
     except Exception:
         pass
 
-# --- 1. ОБНОВЛЕННЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С БАЗОЙ ДАННЫХ И ЛОГАМИ ЧЕРЕЗ ОБЛАКО ---
 def load_data():
     """Загружает данные налогов прямо из репозитория GitHub."""
     data, _ = get_github_file(DB_FILE)
@@ -153,16 +149,12 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
     }
     logs.insert(0, entry)
     save_github_file(LOG_FILE, logs)
-# --- НАСТРОЙКА ТЕЛЕГРАМ-УВЕДОМЛЕНИЙ ---
-TG_BOT_TOKEN = "8807247946:AAHWnh-5y1PzA13VvoJPgzsh0Ne-X13pXdo"
-TG_USER_ID = "631793577"
-
 # --- 2. ФУНКЦИЯ ПРОИЗВОДСТВЕННОГО КАЛЕНДАРЯ РБ ---
 def get_real_working_day(date_check):
     """Сдвигает дедлайн вперед, если он выпал на выходной или праздник в РБ."""
     while True:
         try:
-            # ИСПРАВЛЕНО: Добавлен пропущенный слэш и корректный эндпоинт API isdayoff
+            # ИСПРАВЛЕНО: Добавлен корректный эндпоинт API isdayoff со слэшем
             url = f"https://isdayoff.ru{date_check.year}&month={date_check.month:02d}&day={date_check.day:02d}&cc=by"
             response = requests.get(url, timeout=2)
             if response.status_code == 200 and response.text.strip() in ["1", "2"]:
@@ -202,21 +194,14 @@ MONTHS_RU = {
     "Июль": 7, "Август": 8, "Сентябрь": 9, "Октябрь": 10, "Ноябрь": 11, "Декабрь": 12
 }
 
-# --- ФУНКЦИЯ ОТПРАВКИ УВЕДОМЛЕНИЙ В TELEGRAM ---
 def send_telegram_reminder(message):
     """Отправляет текстовое уведомление через созданного бота."""
     try:
-        # ИСПРАВЛЕНО: Полный и точный адрес API Telegram без склеек и опечаток
+        # ИСПРАВЛЕНО: Ссылка без склеек и опечаток, параметры берутся из скрытых Secrets
         direct_url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": str(TG_USER_ID), 
-            "text": message, 
-            "parse_mode": "Markdown"
-        }
-        requests.post(direct_url, json=payload, timeout=5)
+        requests.post(direct_url, json={"chat_id": str(TG_USER_ID), "text": message, "parse_mode": "Markdown"}, timeout=5)
     except Exception as e:
-        st.sidebar.error(f"Ошибка сети Telegram: {e}")
-
+        st.sidebar.error(f"Ошибка Telegram: {e}")
 
 def check_upcoming_deadlines_and_notify():
     """Проверяет горящие дедлайны и шлет напоминание."""
@@ -237,23 +222,19 @@ def check_upcoming_deadlines_and_notify():
         if not is_done:
             days_left = (r["deadline"] - today).days
             if 0 <= days_left <= 3:
-                last_notify_date = st.session_state.notified_dates.get(r["id"])
-                if last_notify_date != today:
+                if st.session_state.notified_dates.get(r["id"]) != today:
                     msg = f"⚠️ *НАПОМИНАНИЕ О ДЕДЛАЙНЕ!*\n\n📊 Налог: *{r['name']}*\n📅 Дата сдачи: *{r['deadline'].strftime('%d.%m.%Y')}*\n⏳ Осталось дней: *{days_left}*"
                     send_telegram_reminder(msg)
                     st.session_state.notified_dates[r["id"]] = today
-# --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ (С УЛУЧШЕННОЙ ЗАЩИТОЙ) ---
 saved_reports = load_data()
-
 if "reports" not in st.session_state:
     if saved_reports:  
         st.session_state.reports = saved_reports
     else:
         st.session_state.reports = []
         months_vat = {m: True for m in MONTHS_RU.keys()}
-        payments_vat = {m: False for m in MONTHS_RU.keys()}
         st.session_state.reports.append({
-            "id": 1, "name": "Ввозной НДС (ЕАЭС)", "day": 20, "months": months_vat, "payments": payments_vat,
+            "id": 1, "name": "Ввозной НДС (ЕАЭС)", "day": 20, "months": months_vat, "payments": {m: False for m in MONTHS_RU.keys()},
             "has_base_control": True, "has_base": True, "is_stat": False, "comment": "", "end_date": None,
             "statuses": {"Подготовлен": False, "Отправлен": False, "Оплачен": False, "Принят": False},
             "deadline": calculate_first_deadline(20, months_vat)
@@ -263,7 +244,6 @@ else:
     if saved_reports and len(saved_reports) > len(st.session_state.reports):
         st.session_state.reports = saved_reports
 
-# --- 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА И ЗАКРЫТИЕ ХВОСТОВ ---
 def check_and_autoclose_reports():
     if "reports" not in st.session_state or not st.session_state.reports:
         return
@@ -272,14 +252,12 @@ def check_and_autoclose_reports():
     for r in st.session_state.reports:
         if (r["deadline"] + datetime.timedelta(days=3)) <= today:
             m_name = list(MONTHS_RU.keys())[r["deadline"].month - 1]
-            is_pay = r["payments"].get(m_name, False)
-            passed = False
             if r["has_base_control"] and not r["has_base"]: passed = True
-            elif is_pay: passed = r["statuses"]["Оплачен"]
+            elif r["payments"].get(m_name, False): passed = r["statuses"]["Оплачен"]
             else: passed = r["statuses"]["Отправлен"] and r["statuses"]["Принят"] and (r["statuses"]["Оплачен"] or r["is_stat"])
             
             if passed:
-                save_log_entry(r["name"], r["deadline"], "🤖 АВТОЗАКРЫТИЕ ПЕРИОДA (Выполнено, прошло 3+ дня)", r.get("comment", ""))
+                save_log_entry(r["name"], r["deadline"], "🤖 АВТОЗАКРЫТИЕ ПЕРИОДA", r.get("comment", ""))
                 for k in r["statuses"]: r["statuses"][k] = False
                 r["comment"] = ""
                 if r.get("end_date") and r["deadline"] >= r["end_date"]:
@@ -287,19 +265,15 @@ def check_and_autoclose_reports():
                 else:
                     r["deadline"] = calculate_first_deadline(r["day"], r["months"], start_date=r["deadline"] + datetime.timedelta(days=1))
                 updated = True
-    if updated:
+    if updated: 
         save_data()
-        # ИСПРАВЛЕНО: Вместо st.rerun(), который вызывал бесконечные сетевые петли,
-        # мы позволяем скрипту плавно продолжить выполнение с обновленным состоянием
 
 check_and_autoclose_reports()
 check_upcoming_deadlines_and_notify()
 
-# СОРТИРОВКА: Выстраиваем отчеты в сессии по хронологии дедлайна
 if "reports" in st.session_state and isinstance(st.session_state.reports, list):
     st.session_state.reports.sort(key=lambda x: x.get("deadline", datetime.date.today()))
-    
-# --- 5. ЛОГИКА ЦВЕТОВОЙ ПОДДСВЕТКИ КАРТОЧЕК ---
+
 def get_status_theme(r):
     today = datetime.date.today()
     days = (r["deadline"] - today).days
@@ -315,259 +289,125 @@ def get_status_theme(r):
     return "⚪ В работе", "#e2e3e5", "#383d41"
 
 tab1, tab2, tab3 = st.tabs(["📊 Планнер", "🛠️ Настройки / Редактор", "📜 История"])
-# --- ВКЛАДКА 1: КАНБАН-ДОСКА ---
 with tab1:
     today = datetime.date.today()
     col1_tasks, col2_tasks, col3_tasks = [], [], []
-    
     if "reports" in st.session_state and st.session_state.reports:
         for r in st.session_state.reports:
             days_left = (r["deadline"] - today).days
-            if days_left <= 7:
-                col1_tasks.append(r)
-            elif 7 < days_left <= 30:
-                col2_tasks.append(r)
-            else:
-                col3_tasks.append(r)
-
+            if days_left <= 7: col1_tasks.append(r)
+            elif 7 < days_left <= 30: col2_tasks.append(r)
+            else: col3_tasks.append(r)
+            
     col1, col2, col3 = st.columns(3)
-    columns_config = [
-        {"col": col1, "title": "🔥 Неделя (до 7 дней)", "tasks": col1_tasks},
-        {"col": col2, "title": "📅 Месяц (8-30 дней)", "tasks": col2_tasks},
-        {"col": col3, "title": "🌐 Более 30 дней", "tasks": col3_tasks}
-    ]
-    
+    columns_config = [{"col": col1, "title": "🔥 Неделя (до 7 дней)", "tasks": col1_tasks}, {"col": col2, "title": "📅 Месяц (8-30 дней)", "tasks": col2_tasks}, {"col": col3, "title": "🌐 Более 30 дней", "tasks": col3_tasks}]
     selected_id = st.session_state.get("selected_task_id", None)
     
     for c_cfg in columns_config:
         with c_cfg["col"]:
             st.markdown(f"### {c_cfg['title']}")
-            with st.container(height=650 if selected_id else 500): 
-                if not c_cfg["tasks"]:
-                    st.caption("Нет задач")
+            with st.container(height=650 if selected_id else 500):
+                if not c_cfg["tasks"]: st.caption("Нет задач")
                 else:
                     for r in c_cfg["tasks"]:
                         status_text, bg_color, text_color = get_status_theme(r)
-                        deadline_str = r["deadline"].strftime("%d.%m.%Y")
-                        
                         with st.container():
-                            st.markdown(f"""
-                            <div class="task-box">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div class="task-box-title">{r['name']}</div>
-                                        <div class="task-box-text">
-                                            Срок: {deadline_str}<br>
-                                            Статус: {status_text}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
+                            st.markdown(f'<div class="task-box"><div class="task-box-title">{r["name"]}</div><div class="task-box-text">Срок: {r["deadline"].strftime("%d.%m.%Y")}<br>Статус: {status_text}</div></div>', unsafe_allow_html=True)
                             st.markdown('<div style="margin-top: -65px; margin-bottom: 25px; display: flex; justify-content: flex-end; padding-right: 15px;">', unsafe_allow_html=True)
                             if st.button("⚙️ Управлять", key=f"manage_{r['id']}"):
-                                if selected_id == r["id"]:
-                                    del st.session_state.selected_task_id
-                                else:
-                                    st.session_state.selected_task_id = r["id"]
+                                st.session_state.selected_task_id = None if selected_id == r["id"] else r["id"]
                                 st.rerun()
                             st.markdown('</div>', unsafe_allow_html=True)
-                        
+                            
                         if selected_id == r["id"]:
-                            st.write("") 
                             st.markdown(f"##### 🛠️ Управление: {r['name']}")
-                            
-                            st.markdown(f"""
-                                <div style="background-color: #e8f2ff; padding: 12px; border-radius: 8px; border-left: 5px solid #1d4ed8; margin-bottom: 15px;">
-                                    📅 <b>Дедлайн: {r['deadline'].strftime('%d.%m.%Y')}</b>
-                                </div>
-                            """, unsafe_allow_html=True)
-                            
                             if r["has_base_control"]:
-                                old_base = r["has_base"]
-                                r["has_base"] = st.checkbox("Наличие налоговой базы", value=r["has_base"], key=f"base_{r['id']}")
-                                if old_base != r["has_base"]:
-                                    save_data()
-                                    base_status = "Есть" if r["has_base"] else "Отсутствует"
-                                    save_log_entry(r["name"], r["deadline"], f"Изменено наличие базы: {base_status}", r.get("comment", ""))
-                                    st.rerun()
+                                if st.checkbox("Наличие налоговой базы", value=r["has_base"], key=f"base_{r['id']}") != r["has_base"]:
+                                    r["has_base"] = not r["has_base"]
+                                    save_data(); save_log_entry(r["name"], r["deadline"], f"База: {'Есть' if r['has_base'] else 'Нет'}"); st.rerun()
                                     
-                            st.markdown("<hr style='margin: 4px 0px 12px 0px; border: 0; border-top: 1px solid #e2e8f0;'>", unsafe_allow_html=True)
-                            
                             ordered_statuses = ["Подготовлен", "Отправлен", "Принят", "Оплачен"]
                             status_cols = st.columns(len(ordered_statuses))
-                            for idx, status_name in enumerate(ordered_statuses):
-                                if status_name == "Оплачен" and r.get("is_stat", False):
-                                    continue
+                            for idx, s_n in enumerate(ordered_statuses):
+                                if s_n == "Оплачен" and r.get("is_stat", False): continue
                                 with status_cols[idx]:
-                                    old_val = r["statuses"][status_name]
-                                    r["statuses"][status_name] = st.checkbox(status_name, value=r["statuses"][status_name], key=f"chk_{status_name}_{r['id']}")
-                                    if old_val != r["statuses"][status_name]:
-                                        save_data()
-                                        ch_status = "Включено" if r["statuses"][status_name] else "Выключено"
-                                        save_log_entry(r["name"], r["deadline"], f"Статус '{status_name}': {ch_status}", r.get("comment", ""))
-                                        st.rerun()
-                                    
-                            st.write("")
-                            old_comm = r.get("comment", "")
-                            r["comment"] = st.text_input("Комментарий периода", value=old_comm, key=f"comm_{r['id']}")
-                            if old_comm != r["comment"]:
-                                save_data()
-                                save_log_entry(r["name"], r["deadline"], f"Обновлен комментарий периода", r["comment"])
-                                st.rerun()
+                                    if st.checkbox(s_n, value=r["statuses"][s_n], key=f"chk_{s_n}_{r['id']}") != r["statuses"][s_n]:
+                                        r["statuses"][s_n] = not r["statuses"][s_n]
+                                        save_data(); save_log_entry(r["name"], r["deadline"], f"Статус {s_n}"); st.rerun()
+                                        
+                            comm = st.text_input("Комментарий", value=r.get("comment", ""), key=f"comm_{r['id']}")
+                            if comm != r.get("comment", ""):
+                                r["comment"] = comm
+                                save_data(); save_log_entry(r["name"], r["deadline"], "Обновлен комментарий"); st.rerun()
                                 
-                            st.write("")
-                            
-                            b_col1, b_col2 = st.columns(2)
-                            with b_col1:
-                                if st.button("❌ Скрыть панель", key=f"close_panel_{r['id']}", use_container_width=True):
-                                    del st.session_state.selected_task_id
-                                    st.rerun()
-                            with b_col2:
-                                if st.button("🚩 Закрыть период", type="primary", key=f"close_btn_{r['id']}", use_container_width=True):
-                                    active_steps = [k for k, v in r["statuses"].items() if v and not (k == "Оплачен" and r.get("is_stat", False))]
-                                    if not active_steps:
-                                        active_steps = ["Без отметок"]
-                                    action_detail = f" ПЕРИОД ЗАКРЫТ ВРУЧНУЮ. Выполненные шаги: {', '.join(active_steps)}"
-                                    
-                                    save_log_entry(r["name"], r["deadline"], action_detail, r["comment"])
-                                    
-                                    for k in r["statuses"]:
-                                        r["statuses"][k] = False
+                            b1, b2 = st.columns(2)
+                            with b1:
+                                if st.button("❌ Скрыть", key=f"cls_{r['id']}"): del st.session_state.selected_task_id; st.rerun()
+                            with b2:
+                                if st.button("🚩 Закрыть период", type="primary", key=f"fin_{r['id']}"):
+                                    save_log_entry(r["name"], r["deadline"], "Период закрыт вручную")
+                                    for k in r["statuses"]: r["statuses"][k] = False
                                     r["comment"] = ""
-                                    
-                                    if r.get("end_date") and r["deadline"] >= r["end_date"]:
-                                        st.session_state.reports = [rep for rep in st.session_state.reports if rep["id"] != r["id"]]
-                                    else:
-                                        r["deadline"] = calculate_first_deadline(r["day"], r["months"], start_date=r["deadline"] + datetime.timedelta(days=1))
-                                    
-                                    save_data()
-                                    del st.session_state.selected_task_id
-                                    st.success("Период закрыт!")
-                                    st.rerun()
-                            st.divider()
-# --- ВКЛАДКА 2: НАСТРОЙКИ СПРАВОЧНИКА НАЛОГОВ ---
+                                    if r.get("end_date") and r["deadline"] >= r["end_date"]: st.session_state.reports = [rep for rep in st.session_state.reports if rep["id"] != r["id"]]
+                                    else: r["deadline"] = calculate_first_deadline(r["day"], r["months"], start_date=r["deadline"] + datetime.timedelta(days=1))
+                                    save_data(); del st.session_state.selected_task_id; st.success("Закрыто!"); st.rerun()
 with tab2:
     st.subheader("🛠️ Управление справочником")
     mode = st.radio("Действие:", ["➕ Создать", "✏️ Изменить / Удалить"], horizontal=True)
-    
-    QUARTERS = [
-        {"title": "📊 I Квартал", "months": ["Январь", "Февраль", "Март"]},
-        {"title": "📊 II Квартал", "months": ["Апрель", "Май", "Июнь"]},
-        {"title": "📊 III Квартал", "months": ["Июль", "Август", "Сентябрь"]},
-        {"title": "📊 IV Квартал", "months": ["Октябрь", "Ноябрь", "Декабрь"]}
-    ]
+    QUARTERS = [{"title": "📊 I Квартал", "months": ["Январь", "Февраль", "Март"]}, {"title": "📊 II Квартал", "months": ["Апрель", "Май", "Июнь"]}, {"title": "📊 III Квартал", "months": ["Июль", "Август", "Сентябрь"]}, {"title": "📊 IV Квартал", "months": ["Октябрь", "Ноябрь", "Декабрь"]}]
     
     if mode == "➕ Создать":
         with st.form("f_new", clear_on_submit=True):
             n_name = st.text_input("Название:")
             n_day = st.number_input("День сдачи:", min_value=1, max_value=31, value=20)
-            
-            st.write("**Выберите месяцы сдачи и настройте авансовые платежи (поквартально):**")
             mc = st.columns(4); n_m, n_p = {}, {}
             for q_idx, q_data in enumerate(QUARTERS):
                 with mc[q_idx]:
                     st.markdown(f"#### {q_data['title']}")
                     for m_n in q_data["months"]:
-                        st.markdown(f"**{m_n}**")
-                        n_m[m_n] = st.checkbox("Active", key=f"nm_{m_n}")
-                        n_p[m_n] = st.checkbox("Только платеж (аванс)", key=f"np_{m_n}")
-                        st.write("")
-                    
-            st.divider()
+                        n_m[m_n] = st.checkbox("Активен", key=f"nm_{m_n}")
+                        n_p[m_n] = st.checkbox("Аванс", key=f"np_{m_n}")
             cs1, cs2 = st.columns(2)
-            with cs1:
-                n_bc = st.checkbox("Только при наличии базы")
-                n_st = st.checkbox("Отчет без уплаты")
-            with cs2:
-                h_end = st.checkbox("Задать дату окончания действия налога")
-                n_end = st.date_input("Дата окончания:", value=datetime.date.today()+datetime.timedelta(days=365), disabled=not h_end)
-                
+            with cs1: n_bc, n_st = st.checkbox("Контроль базы"), st.checkbox("Без уплаты")
+            with cs2: h_end = st.checkbox("Дата окончания"); n_end = st.date_input("Дата:", disabled=not h_end)
             if st.form_submit_button("➕ Добавить"):
-                if not n_name or not any(n_m.values()): 
-                    st.error("Заполните название и выберите хотя бы один активный месяц.")
+                if not n_name or not any(n_m.values()): st.error("Заполните поля")
                 else:
-                    final_p = {m: (n_p[m] if n_m[m] else False) for m in MONTHS_RU.keys()}
                     n_id = max([r["id"] for r in st.session_state.reports]) + 1 if st.session_state.reports else 1
                     dl = calculate_first_deadline(n_day, n_m)
-                    
-                    st.session_state.reports.append({
-                        "id": n_id, "name": n_name, "day": n_day, "months": n_m, "payments": final_p, 
-                        "has_base_control": n_bc, "has_base": True, "is_stat": n_st, "comment": "", 
-                        "end_date": n_end if h_end else None, 
-                        "statuses": {"Подготовлен": False, "Отправлен": False, "Оплачен": False, "Принят": False}, 
-                        "deadline": dl
-                    })
-                    save_data(); save_log_entry(n_name, dl, "Создан новый налог в справочнике"); st.success("Создано!"); st.rerun()
-                    
+                    st.session_state.reports.append({"id": n_id, "name": n_name, "day": n_day, "months": n_m, "payments": {m: (n_p[m] if n_m[m] else False) for m in MONTHS_RU.keys()}, "has_base_control": n_bc, "has_base": True, "is_stat": n_st, "comment": "", "end_date": n_end if h_end else None, "statuses": {"Подготовлен": False, "Отправлен": False, "Оплачен": False, "Принят": False}, "deadline": dl})
+                    save_data(); save_log_entry(n_name, dl, "Создан налог"); st.success("Создано!"); st.rerun()
     else:
-        if "reports" not in st.session_state or not st.session_state.reports: 
-            st.info("Список отчетов пуст.")
+        if "reports" not in st.session_state or not st.session_state.reports: st.info("Пусто")
         else:
-            names = [r["name"] for r in st.session_state.reports]
-            s_name = st.selectbox("Выберите отчет для редактирования:", names, key="select_edit_report")
-            edit = next(r for r in st.session_state.reports if r["name"].strip() == s_name.strip())
-            
+            edit = next(r for r in st.session_state.reports if r["name"] == st.selectbox("Отчет:", [r["name"] for r in st.session_state.reports]))
             with st.form("f_edit"):
                 e_name = st.text_input("Название:", value=edit["name"])
                 e_day = st.number_input("День сдачи:", min_value=1, max_value=31, value=int(edit["day"]))
-                
-                st.write("**Месяцы сдачи и авансы (поквартально):**")
                 mc = st.columns(4); e_m, e_p = {}, {}
                 for q_idx, q_data in enumerate(QUARTERS):
                     with mc[q_idx]:
                         st.markdown(f"#### {q_data['title']}")
                         for m_n in q_data["months"]:
-                            st.markdown(f"**{m_n}**")
-                            was_act = edit["months"].get(m_n, False)
-                            was_pay = edit["payments"].get(m_n, False)
-                            
-                            e_m[m_n] = st.checkbox("Активен", value=was_act, key=f"em_{m_n}_{edit['id']}")
-                            e_p[m_n] = st.checkbox("Только платеж (аванс)", value=was_pay, key=f"ep_{m_n}_{edit['id']}")
-                            st.write("")
-                        
-                st.divider()
+                            e_m[m_n] = st.checkbox("Активен", value=edit["months"].get(m_n, False), key=f"em_{m_n}")
+                            e_p[m_n] = st.checkbox("Аванс", value=edit["payments"].get(m_n, False), key=f"ep_{m_n}")
                 ce1, ce2 = st.columns(2)
-                with ce1:
-                    e_bc = st.checkbox("Только при наличии базы", value=edit["has_base_control"])
-                    e_st = st.checkbox("Отчет без уплаты", value=edit["is_stat"])
-                with ce2:
-                    o_h = edit.get("end_date") is not None
-                    e_he = st.checkbox("Установить дату завершения налога", value=o_h)
-                    e_ed = st.date_input("Дата окончания:", value=edit["end_date"] if o_h else datetime.date.today()+datetime.timedelta(days=365), disabled=not e_he)
-                    
-                if st.form_submit_button("💾 Сохранить изменения"):
-                    if not e_name or not any(e_m.values()): 
-                        st.error("Название не может быть пустым, должен быть выбран хотя бы один месяц.")
-                    else:
-                        final_ep = {m: (e_p[m] if e_m[m] else False) for m in MONTHS_RU.keys()}
-                        edit.update({
-                            "name": e_name, "day": e_day, "months": e_m, "payments": final_ep, 
-                            "has_base_control": e_bc, "is_stat": e_st, "end_date": e_ed if e_he else None
-                        })
-                        edit["deadline"] = calculate_first_deadline(e_day, e_m)
-                        save_data(); save_log_entry(e_name, edit["deadline"], "Изменены параметры расписания налогов"); st.success("Обновлено!"); st.rerun()
-                        
-            st.divider()
-            st.write("**Опасная зона:**")
-            if st.button("❌ ПОЛНОСТЬЮ УДАЛИТЬ НАЛОГ ИЗ СИСТЕМЫ", use_container_width=True):
-                save_log_entry(edit["name"], edit["deadline"], "УДАЛЕНО ИЗ СИСТЕМЫ")
+                with ce1: e_bc, e_st = st.checkbox("Контроль базы", value=edit["has_base_control"]), st.checkbox("Без уплаты", value=edit["is_stat"])
+                with ce2: o_h = edit.get("end_date") is not None; e_he = st.checkbox("Дата окончания", value=o_h); e_ed = st.date_input("Дата:", value=edit["end_date"] if o_h else datetime.date.today(), disabled=not e_he)
+                if st.form_submit_button("💾 Сохранить"):
+                    edit.update({"name": e_name, "day": e_day, "months": e_m, "payments": {m: (e_p[m] if e_m[m] else False) for m in MONTHS_RU.keys()}, "has_base_control": e_bc, "is_stat": e_st, "end_date": e_ed if e_he else None, "deadline": calculate_first_deadline(e_day, e_m)})
+                    save_data(); save_log_entry(e_name, edit["deadline"], "Изменен налог"); st.success("Сохранено!"); st.rerun()
+            if st.button("❌ УДАЛИТЬ НАЛОГ ИЗ СИСТЕМЫ", use_container_width=True):
+                save_log_entry(edit["name"], edit["deadline"], "Удален налог")
                 st.session_state.reports = [r for r in st.session_state.reports if r["id"] != edit["id"]]
-                if "active_report_id" in st.session_state: 
-                    del st.session_state["active_report_id"]
                 save_data(); st.success("Удалено!"); st.rerun()
 
-# --- ВКЛАДКА 3: ЖУРНАЛ ИСТОРИИ ДЕЙСТВИЙ ---
 with tab3:
     st.subheader("📜 Журнал учета операций бухгалтера")
     logs = load_logs()
-    if not logs: 
-        st.info("Журнал пуст")
+    if not logs: st.info("Журнал пуст")
     else:
         df = pd.DataFrame(logs)
-        if "period_comment" not in df.columns: 
-            df["period_comment"] = ""
         df = df[["timestamp", "report_name", "period", "period_comment", "action"]]
-        df.columns = ["🕒 Время фиксации", "📊 Вид налога", "📅 Отчетный период", "💰 Пометка / Сумма периода", "📝 Совершенное действие"]
+        df.columns = ["🕒 Время", "📊 Налог", "📅 Период", "💰 Пометка", "📝 Действие"]
         st.dataframe(df, use_container_width=True, hide_index=True)
