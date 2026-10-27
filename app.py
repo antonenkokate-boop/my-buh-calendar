@@ -443,3 +443,127 @@ with tab1:
                                     st.success("Период закрыт!")
                                     st.rerun()
                             st.divider()
+# --- ВКЛАДКА 2: НАСТРОЙКИ СПРАВОЧНИКА НАЛОГОВ ---
+with tab2:
+    st.subheader("🛠️ Управление справочником")
+    mode = st.radio("Действие:", ["➕ Создать", "✏️ Изменить / Удалить"], horizontal=True)
+    
+    QUARTERS = [
+        {"title": "📊 I Квартал", "months": ["Январь", "Февраль", "Март"]},
+        {"title": "📊 II Квартал", "months": ["Апрель", "Май", "Июнь"]},
+        {"title": "📊 III Квартал", "months": ["Июль", "Август", "Сентябрь"]},
+        {"title": "📊 IV Квартал", "months": ["Октябрь", "Ноябрь", "Декабрь"]}
+    ]
+    
+    if mode == "➕ Создать":
+        with st.form("f_new", clear_on_submit=True):
+            n_name = st.text_input("Название:")
+            n_day = st.number_input("День сдачи:", min_value=1, max_value=31, value=20)
+            
+            st.write("**Выберите месяцы сдачи и настройте авансовые платежи (поквартально):**")
+            mc = st.columns(4); n_m, n_p = {}, {}
+            for q_idx, q_data in enumerate(QUARTERS):
+                with mc[q_idx]:
+                    st.markdown(f"#### {q_data['title']}")
+                    for m_n in q_data["months"]:
+                        st.markdown(f"**{m_n}**")
+                        n_m[m_n] = st.checkbox("Active", key=f"nm_{m_n}")
+                        n_p[m_n] = st.checkbox("Только платеж (аванс)", key=f"np_{m_n}")
+                        st.write("")
+                    
+            st.divider()
+            cs1, cs2 = st.columns(2)
+            with cs1:
+                n_bc = st.checkbox("Только при наличии базы")
+                n_st = st.checkbox("Отчет без уплаты")
+            with cs2:
+                h_end = st.checkbox("Задать дату окончания действия налога")
+                n_end = st.date_input("Дата окончания:", value=datetime.date.today()+datetime.timedelta(days=365), disabled=not h_end)
+                
+            if st.form_submit_button("➕ Добавить"):
+                if not n_name or not any(n_m.values()): 
+                    st.error("Заполните название и выберите хотя бы один активный месяц.")
+                else:
+                    final_p = {m: (n_p[m] if n_m[m] else False) for m in MONTHS_RU.keys()}
+                    n_id = max([r["id"] for r in st.session_state.reports]) + 1 if st.session_state.reports else 1
+                    dl = calculate_first_deadline(n_day, n_m)
+                    
+                    st.session_state.reports.append({
+                        "id": n_id, "name": n_name, "day": n_day, "months": n_m, "payments": final_p, 
+                        "has_base_control": n_bc, "has_base": True, "is_stat": n_st, "comment": "", 
+                        "end_date": n_end if h_end else None, 
+                        "statuses": {"Подготовлен": False, "Отправлен": False, "Оплачен": False, "Принят": False}, 
+                        "deadline": dl
+                    })
+                    save_data(); save_log_entry(n_name, dl, "Создан новый налог в справочнике"); st.success("Создано!"); st.rerun()
+                    
+    else:
+        if "reports" not in st.session_state or not st.session_state.reports: 
+            st.info("Список отчетов пуст.")
+        else:
+            names = [r["name"] for r in st.session_state.reports]
+            s_name = st.selectbox("Выберите отчет для редактирования:", names, key="select_edit_report")
+            edit = next(r for r in st.session_state.reports if r["name"].strip() == s_name.strip())
+            
+            with st.form("f_edit"):
+                e_name = st.text_input("Название:", value=edit["name"])
+                e_day = st.number_input("День сдачи:", min_value=1, max_value=31, value=int(edit["day"]))
+                
+                st.write("**Месяцы сдачи и авансы (поквартально):**")
+                mc = st.columns(4); e_m, e_p = {}, {}
+                for q_idx, q_data in enumerate(QUARTERS):
+                    with mc[q_idx]:
+                        st.markdown(f"#### {q_data['title']}")
+                        for m_n in q_data["months"]:
+                            st.markdown(f"**{m_n}**")
+                            was_act = edit["months"].get(m_n, False)
+                            was_pay = edit["payments"].get(m_n, False)
+                            
+                            e_m[m_n] = st.checkbox("Активен", value=was_act, key=f"em_{m_n}_{edit['id']}")
+                            e_p[m_n] = st.checkbox("Только платеж (аванс)", value=was_pay, key=f"ep_{m_n}_{edit['id']}")
+                            st.write("")
+                        
+                st.divider()
+                ce1, ce2 = st.columns(2)
+                with ce1:
+                    e_bc = st.checkbox("Только при наличии базы", value=edit["has_base_control"])
+                    e_st = st.checkbox("Отчет без уплаты", value=edit["is_stat"])
+                with ce2:
+                    o_h = edit.get("end_date") is not None
+                    e_he = st.checkbox("Установить дату завершения налога", value=o_h)
+                    e_ed = st.date_input("Дата окончания:", value=edit["end_date"] if o_h else datetime.date.today()+datetime.timedelta(days=365), disabled=not e_he)
+                    
+                if st.form_submit_button("💾 Сохранить изменения"):
+                    if not e_name or not any(e_m.values()): 
+                        st.error("Название не может быть пустым, должен быть выбран хотя бы один месяц.")
+                    else:
+                        final_ep = {m: (e_p[m] if e_m[m] else False) for m in MONTHS_RU.keys()}
+                        edit.update({
+                            "name": e_name, "day": e_day, "months": e_m, "payments": final_ep, 
+                            "has_base_control": e_bc, "is_stat": e_st, "end_date": e_ed if e_he else None
+                        })
+                        edit["deadline"] = calculate_first_deadline(e_day, e_m)
+                        save_data(); save_log_entry(e_name, edit["deadline"], "Изменены параметры расписания налогов"); st.success("Обновлено!"); st.rerun()
+                        
+            st.divider()
+            st.write("**Опасная зона:**")
+            if st.button("❌ ПОЛНОСТЬЮ УДАЛИТЬ НАЛОГ ИЗ СИСТЕМЫ", use_container_width=True):
+                save_log_entry(edit["name"], edit["deadline"], "УДАЛЕНО ИЗ СИСТЕМЫ")
+                st.session_state.reports = [r for r in st.session_state.reports if r["id"] != edit["id"]]
+                if "active_report_id" in st.session_state: 
+                    del st.session_state["active_report_id"]
+                save_data(); st.success("Удалено!"); st.rerun()
+
+# --- ВКЛАДКА 3: ЖУРНАЛ ИСТОРИИ ДЕЙСТВИЙ ---
+with tab3:
+    st.subheader("📜 Журнал учета операций бухгалтера")
+    logs = load_logs()
+    if not logs: 
+        st.info("Журнал пуст")
+    else:
+        df = pd.DataFrame(logs)
+        if "period_comment" not in df.columns: 
+            df["period_comment"] = ""
+        df = df[["timestamp", "report_name", "period", "period_comment", "action"]]
+        df.columns = ["🕒 Время фиксации", "📊 Вид налога", "📅 Отчетный период", "💰 Пометка / Сумма периода", "📝 Совершенное действие"]
+        st.dataframe(df, use_container_width=True, hide_index=True)
