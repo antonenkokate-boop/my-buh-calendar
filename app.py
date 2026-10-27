@@ -54,7 +54,7 @@ GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 TG_BOT_TOKEN = st.secrets["TG_BOT_TOKEN"]
 TG_USER_ID = st.secrets["TG_USER_ID"]
 
-GITHUB_REPO = "antonenkokate-boop/my-buh-calendar"
+GITHUB_REPO = "/antonenkokate-boop/my-buh-calendar"
 DB_FILE = "database.json"
 LOG_FILE = "history_logs.json"
 def get_github_file(filename):
