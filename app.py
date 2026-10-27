@@ -150,7 +150,6 @@ def save_data():
     except Exception as e:
         st.error(f"Ошибка сохранения базы данных: {e}")
 
-def load_logs():
     """Загружает история действий бухгалтера из репозитория GitHub."""
     data, _ = get_github_file(LOG_FILE)
     return data if data else []
