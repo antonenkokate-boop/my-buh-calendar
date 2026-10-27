@@ -354,7 +354,12 @@ with tab1:
 with tab2:
     st.subheader("🛠️ Управление справочником")
     mode = st.radio("Действие:", ["➕ Создать", "✏️ Изменить / Удалить"], horizontal=True)
-    QUARTERS = [{"title": "📊 I Квартал", "months": ["Январь", "Февраль", "Март"]}, {"title": "📊 II Квартал", "months": ["Апрель", "Май", "Июнь"]}, {"title": "📊 III Квартал", "months": ["Июль", "Август", "Сентябрь"]}, {"title": "📊 IV Квартал", "months": ["Октябрь", "Ноябрь", "Декабрь"]}]
+    QUARTERS = [
+        {"title": "📊 I Квартал", "months": ["Январь", "Февраль", "Март"]},
+        {"title": "📊 II Квартал", "months": ["Апрель", "Май", "Июнь"]},
+        {"title": "📊 III Квартал", "months": ["Июль", "Август", "Сентябрь"]},
+        {"title": "📊 IV Квартал", "months": ["Октябрь", "Ноябрь", "Декабрь"]}
+    ]
     
     if mode == "➕ Создать":
         with st.form("f_new", clear_on_submit=True):
@@ -365,6 +370,7 @@ with tab2:
                 with mc[q_idx]:
                     st.markdown(f"#### {q_data['title']}")
                     for m_n in q_data["months"]:
+                        st.markdown(f"**{m_n}**")  # ИСПРАВЛЕНО: Выводим название месяца жирным
                         n_m[m_n] = st.checkbox("Активен", key=f"nm_{m_n}")
                         n_p[m_n] = st.checkbox("Аванс", key=f"np_{m_n}")
             cs1, cs2 = st.columns(2)
@@ -389,6 +395,7 @@ with tab2:
                     with mc[q_idx]:
                         st.markdown(f"#### {q_data['title']}")
                         for m_n in q_data["months"]:
+                            st.markdown(f"**{m_n}**")  # ИСПРАВЛЕНО: Выводим название месяца жирным
                             e_m[m_n] = st.checkbox("Активен", value=edit["months"].get(m_n, False), key=f"em_{m_n}")
                             e_p[m_n] = st.checkbox("Аванс", value=edit["payments"].get(m_n, False), key=f"ep_{m_n}")
                 ce1, ce2 = st.columns(2)
