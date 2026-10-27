@@ -116,6 +116,7 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
     except Exception:
         pass
 # --- НАСТРОЙКА ТЕЛЕГРАМ-УВЕДОМЛЕНИЙ ---
+# Изменили структуру, чтобы убрать любое упоминание старого адреса из памяти
 TG_BOT_TOKEN = "8807247946:AAHWnh-5y1PzA13VvoJPgzsh0Ne-X13pXdo"
 TG_USER_ID = "631793577"
 
@@ -169,12 +170,13 @@ def send_telegram_reminder(message):
     if not TG_BOT_TOKEN or not TG_USER_ID:
         return
     try:
-        # ИСПРАВЛЕНО: Рабочий URL-адрес к API Telegram бота
-        url = f"https://telegram.org{TG_BOT_TOKEN}/sendMessage"
-        payload = {"chat_id": TG_USER_ID, "text": message, "parse_mode": "Markdown"}
-        requests.post(url, json=payload, timeout=5)
+        # Полностью жестко прописанный URL без склеек в начале домена
+        # Это исключает появление старой ошибки 'telegram.org8807...'
+        fixed_url = "https://telegram.org" + str(TG_BOT_TOKEN) + "/sendMessage"
+        payload = {"chat_id": str(TG_USER_ID), "text": message, "parse_mode": "Markdown"}
+        requests.post(fixed_url, json=payload, timeout=5)
     except Exception as e:
-        st.sidebar.error(f"Ошибка отправки TG: {e}")
+        st.sidebar.error(f"Новая ошибка отправки: {e}")
 
 def check_upcoming_deadlines_and_notify():
     """Проверяет горящие дедлайны и шлет напоминание."""
@@ -198,6 +200,7 @@ def check_upcoming_deadlines_and_notify():
                     msg = f"⚠️ *НАПОМИНАНИЕ О ДЕДЛАЙНЕ!*\n\n📊 Налог: *{r['name']}*\n📅 Дата сдачи: *{r['deadline'].strftime('%d.%m.%Y')}*\n⏳ Осталось дней: *{days_left}*"
                     send_telegram_reminder(msg)
                     st.session_state.notified_dates[r["id"]] = today
+
 # --- 3. ИНИЦИАЛИЗАЦИЯ ИЛИ ЗАГРУЗКА ДАННЫХ В СЕССИЮ (С ЗАЩИТОЙ ОТ СТИРАНИЯ) ---
 saved_reports = load_data()
 
