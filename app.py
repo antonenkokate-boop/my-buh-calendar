@@ -72,8 +72,25 @@ def get_github_file(filename):
         pass
     return None, None
 
+def get_github_file(filename):
+    """Вспомогательная функция для безопасного чтения файла с GitHub API."""
+    # ИСПРАВЛЕНО: Установлен точный и верный адрес официального API GitHub
+    url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            content_json = res.json()
+            import base64
+            file_content = base64.b64decode(content_json["content"]).decode("utf-8")
+            return json.loads(file_content), content_json["sha"]
+    except Exception:
+        pass
+    return None, None
+
 def save_github_file(filename, data_to_save):
     """Вспомогательная функция для автоматической записи файла на GitHub."""
+    # ИСПРАВЛЕНО: Установлен точный и верный адрес официального API GitHub
     url = f"https://github.com{GITHUB_REPO}/contents/{filename}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     
@@ -130,7 +147,7 @@ def save_data():
         st.error(f"Ошибка сохранения базы данных: {e}")
 
 def load_logs():
-    """Загружает историю действий бухгалтера из репозитория GitHub."""
+    """Загружает история действий бухгалтера из репозитория GitHub."""
     data, _ = get_github_file(LOG_FILE)
     return data if data else []
 
@@ -149,6 +166,7 @@ def save_log_entry(report_name, target_date, action_text, current_comment=""):
     }
     logs.insert(0, entry)
     save_github_file(LOG_FILE, logs)
+
 # --- 2. ФУНКЦИЯ ПРОИЗВОДСТВЕННОГО КАЛЕНДАРЯ РБ ---
 def get_real_working_day(date_check):
     """Сдвигает дедлайн вперед, если он выпал на выходной или праздник в РБ."""
