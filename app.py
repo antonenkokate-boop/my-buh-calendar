@@ -204,19 +204,22 @@ MONTHS_RU = {
     "Июль": 7, "Август": 8, "Сентябрь": 9, "Октябрь": 10, "Ноябрь": 11, "Декабрь": 12
 }
 
-# --- ФУНКЦИЯ ОТПРАВКИ УВЕДОМЛЕНИЙ В TELEGRAM ---
+# --- ФУНКЦИЯ ОТПРАВКИ УВЕДОМЛЕНИЙ В TELEGRAM (АБСОЛЮТНАЯ СТАТИКА) ---
 def send_telegram_reminder(message):
     """Отправляет текстовое уведомление через созданного бота."""
-    if not TG_BOT_TOKEN or not TG_USER_ID:
-        return
     try:
-        # Полностью жестко прописанный URL без склеек в начале домена
-        # Это исключает появление старой ошибки 'telegram.org8807...'
-        fixed_url = "https://telegram.org" + str(TG_BOT_TOKEN) + "/sendMessage"
-        payload = {"chat_id": str(TG_USER_ID), "text": message, "parse_mode": "Markdown"}
-        requests.post(fixed_url, json=payload, timeout=5)
+        # Полностью готовая прямая ссылка без единой переменной в адресе хоста.
+        # Это физически исключает ошибку 'telegram.org8807...'
+        direct_url = "https://telegram.org"
+        
+        payload = {
+            "chat_id": "631793577", 
+            "text": message, 
+            "parse_mode": "Markdown"
+        }
+        requests.post(direct_url, json=payload, timeout=5)
     except Exception as e:
-        st.sidebar.error(f"Новая ошибка отправки: {e}")
+        st.sidebar.error(f"Критическая ошибка сети: {e}")
 
 def check_upcoming_deadlines_and_notify():
     """Проверяет горящие дедлайны и шлет напоминание."""
